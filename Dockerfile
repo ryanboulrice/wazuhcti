@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["python", "connector.py"]
+CMD ["sh", "-c", "until curl -s http://opencti:8080/graphql > /dev/null; do echo 'Waiting for OpenCTI...'; sleep 5; done; python connector.py"]
