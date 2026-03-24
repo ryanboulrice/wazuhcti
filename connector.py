@@ -1,3 +1,5 @@
+import time
+import traceback
 import ipaddress
 import json
 from datetime import datetime
@@ -365,9 +367,19 @@ class WazuhEnrichmentConnector:
 
     def start(self) -> None:
         # Connector loop, waits for enrichment jobs
+        self.helper.log_info("Starting Wazuh enrichment connector")
         self.helper.listen(message_callback=self._message_callback)
+
+        # If listen ever returns, treat it as a failure and keep the reason visible
+        raise RuntimeError("OpenCTI helper.listen() returned unexpectedly")
 
 
 if __name__ == "__main__":
-    connector = WazuhEnrichmentConnector()
-    connector.start()
+    try:
+        connector = WazuhEnrichmentConnector()
+        connector.start()
+    except Exception as exc:
+        print(f"FATAL: {exc}", flush=True)
+        traceback.print_exc()
+        time.sleep(5)
+        raise
