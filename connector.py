@@ -574,20 +574,21 @@ class WazuhEnrichmentConnector:
             lines = [
                 header,
                 "",
-                "Assessment",
-                "Severity: none",
-                "Analyst takeaway: No matching Wazuh alerts were found for this entity in the current lookback window.",
+                "**Assessment**",
+                "- Severity: none",
+                "- Analyst takeaway: No matching Wazuh alerts were found for this entity in the current lookback window.",
                 "",
-                "Summary",
-                f"Entity type: {entity_type}",
-                f"Entity value: {entity_value}",
-                f"Lookback window: {self.config.query_lookback_days} days",
+                "**Summary**",
+                f"- Entity type: {entity_type}",
+                f"- Entity value: {entity_value}",
+                f"- Lookback window: {self.config.query_lookback_days} days",
                 "",
-                "Suggested Wazuh hunt query",
+                "**Suggested Wazuh hunt query**",
+                "",
                 hunt_query,
             ]
             if hunt_url:
-                lines.extend(["", "Suggested Wazuh hunt URL", hunt_url])
+                lines.extend(["", "**Suggested Wazuh hunt URL**", hunt_url])
             return "\n".join(lines)
 
         total = len(alerts)
@@ -646,41 +647,29 @@ class WazuhEnrichmentConnector:
             f"This entity matched {total} Wazuh alert(s) across {scoring['unique_agents']} agent(s) "
             f"and {scoring['unique_rules']} rule pattern(s)."
         )
-
         lines = [
-            f"**{header}**",
+            header,
             "",
             "**Assessment**",
-            f"• Severity: {scoring['severity']}",
-            f"• Score: {scoring['score']}",
-            f"• Analyst takeaway: {analyst_takeaway}",
+            f"- Severity: {scoring['severity']}",
+            f"- Score: {scoring['score']}",
+            f"- Analyst takeaway: {analyst_takeaway}",
             "",
             "**Summary**",
-            f"• Entity type: {entity_type}",
-            f"• Entity value: {entity_value}",
-            f"• Lookback window: {self.config.query_lookback_days} days",
-            f"• Total matches: {total}",
-            f"• First seen: {first_seen}",
-            f"• Last seen: {last_seen}",
-            f"• Max Wazuh rule level: {scoring['max_rule_level']}",
-            f"• Unique agents: {scoring['unique_agents']}",
-            f"• Unique rule patterns: {scoring['unique_rules']}",
-            f"• Matches in last {self.config.recent_hits_window_hours} hour(s): {scoring['recent_hits']}",
-            f"• Source categories: {', '.join(scoring['source_categories']) or 'none'}",
-            "",
-            "**Top agents**",
-            *top_agents,
-            "",
-            "**Top matching rules**",
-            *top_rules,
-            "",
-            "**Top alert clusters**",
-            *top_clusters,
-            "",
-            "**Related observables for analyst pivoting**",
-            *related_lines,
+            f"- Entity type: {entity_type}",
+            f"- Entity value: {entity_value}",
+            f"- Lookback window: {self.config.query_lookback_days} days",
+            f"- Total matches: {total}",
+            f"- First seen: {first_seen}",
+            f"- Last seen: {last_seen}",
+            f"- Max Wazuh rule level: {scoring['max_rule_level']}",
+            f"- Unique agents: {scoring['unique_agents']}",
+            f"- Unique rule patterns: {scoring['unique_rules']}",
+            f"- Matches in last {self.config.recent_hits_window_hours} hour(s): {scoring['recent_hits']}",
+            f"- Source categories: {', '.join(scoring['source_categories']) or 'none'}",
             "",
             "**Suggested Wazuh hunt query**",
+            "",
             hunt_query,
         ]
 
