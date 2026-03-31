@@ -647,15 +647,18 @@ class WazuhEnrichmentConnector:
             f"This entity matched {total} Wazuh alert(s) across {scoring['unique_agents']} agent(s) "
             f"and {scoring['unique_rules']} rule pattern(s)."
         )
+
         lines = [
             header,
             "",
             "**Assessment**",
+            "",
             f"- Severity: {scoring['severity']}",
             f"- Score: {scoring['score']}",
             f"- Analyst takeaway: {analyst_takeaway}",
             "",
             "**Summary**",
+            "",
             f"- Entity type: {entity_type}",
             f"- Entity value: {entity_value}",
             f"- Lookback window: {self.config.query_lookback_days} days",
@@ -668,10 +671,30 @@ class WazuhEnrichmentConnector:
             f"- Matches in last {self.config.recent_hits_window_hours} hour(s): {scoring['recent_hits']}",
             f"- Source categories: {', '.join(scoring['source_categories']) or 'none'}",
             "",
+            "**Top agents**",
+            "",
+            *[f"- {name}: {count}" for name, count in top_agents_list] or ["- none"],
+            "",
+            "**Top matching rules**",
+            "",
+            *[f"- {name}: {count}" for name, count in top_rules_list] or ["- none"],
+            "",
+            "**Top alert clusters**",
+            "",
+            *[
+                f"- Rule {item['rule_id']} on {item['agent']}: {item['count']} hits ({item['rule_desc']})"
+                for item in clusters
+            ] or ["- none"],
+            "",
+            "**Related observables for analyst pivoting**",
+            "",
+            *related_lines,
+            "",
             "**Suggested Wazuh hunt query**",
             "",
             hunt_query,
         ]
+    
 
         if hunt_url:
             lines.extend(["", "**Suggested Wazuh hunt URL**", hunt_url])
