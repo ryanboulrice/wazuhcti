@@ -492,7 +492,7 @@ class WazuhEnrichmentConnector:
         }
 
     def _score_alerts(self, alerts: list[dict[str, Any]]) -> dict[str, Any]:
-        # Produces a simple triage score and severity band for analyst-facing notes
+        # Produces a simple triage score and severity band for analyst notes
         if not alerts:
             return {
                 "score": 0,
@@ -523,6 +523,8 @@ class WazuhEnrichmentConnector:
                 if age_seconds <= (self.config.recent_hits_window_hours * 3600):
                     recent_hits += 1
 
+        # Score = number of alerts + severity of alerts + number of affected agents + 
+        # how recent the alerts are (each part capped)
         score = 0
         score += min(len(alerts), 25)
         score += min(max_rule_level * 2, 30)
@@ -530,11 +532,11 @@ class WazuhEnrichmentConnector:
         score += min(recent_hits, 15)
 
         if max_rule_level >= 12 or len(agents) >= 5:
-            severity = "high"
+            severity = "High"
         elif max_rule_level >= 8 or len(alerts) >= 10:
-            severity = "medium"
+            severity = "Medium"
         else:
-            severity = "low"
+            severity = "Low"
 
         return {
             "score": score,
@@ -573,13 +575,13 @@ class WazuhEnrichmentConnector:
                 header,
                 "",
                 "Assessment",
-                "1. Severity: none",
-                "2. Analyst takeaway: No matching Wazuh alerts were found for this entity in the current lookback window.",
+                "Severity: none",
+                "Analyst takeaway: No matching Wazuh alerts were found for this entity in the current lookback window.",
                 "",
                 "Summary",
-                f"1. Entity type: {entity_type}",
-                f"2. Entity value: {entity_value}",
-                f"3. Lookback window: {self.config.query_lookback_days} days",
+                f"Entity type: {entity_type}",
+                f"Entity value: {entity_value}",
+                f"Lookback window: {self.config.query_lookback_days} days",
                 "",
                 "Suggested Wazuh hunt query",
                 hunt_query,
@@ -649,22 +651,22 @@ class WazuhEnrichmentConnector:
             header,
             "",
             "Assessment",
-            f"1. Severity: {scoring['severity']}",
-            f"2. Score: {scoring['score']}",
-            f"3. Analyst takeaway: {analyst_takeaway}",
+            f"Severity: {scoring['severity']}",
+            f"Score: {scoring['score']}",
+            f"Analyst takeaway: {analyst_takeaway}",
             "",
             "Summary",
-            f"1. Entity type: {entity_type}",
-            f"2. Entity value: {entity_value}",
-            f"3. Lookback window: {self.config.query_lookback_days} days",
-            f"4. Total matches: {total}",
-            f"5. First seen: {first_seen}",
-            f"6. Last seen: {last_seen}",
-            f"7. Max Wazuh rule level: {scoring['max_rule_level']}",
-            f"8. Unique agents: {scoring['unique_agents']}",
-            f"9. Unique rule patterns: {scoring['unique_rules']}",
-            f"10. Matches in last {self.config.recent_hits_window_hours} hour(s): {scoring['recent_hits']}",
-            f"11. Source categories: {', '.join(scoring['source_categories']) or 'none'}",
+            f"Entity type: {entity_type}",
+            f"Entity value: {entity_value}",
+            f"Lookback window: {self.config.query_lookback_days} days",
+            f"Total matches: {total}",
+            f"First seen: {first_seen}",
+            f"Last seen: {last_seen}",
+            f"Max Wazuh rule level: {scoring['max_rule_level']}",
+            f"Unique agents: {scoring['unique_agents']}",
+            f"Unique rule patterns: {scoring['unique_rules']}",
+            f"Matches in last {self.config.recent_hits_window_hours} hour(s): {scoring['recent_hits']}",
+            f"Source categories: {', '.join(scoring['source_categories']) or 'none'}",
             "",
             "Top agents",
             *top_agents,
@@ -678,7 +680,7 @@ class WazuhEnrichmentConnector:
             "Related observables for analyst pivoting",
             *related_lines,
             "",
-            "Suggested Wazuh hunt query",
+            "Suggested Wazuh hunt query: ",
             hunt_query,
         ]
 
