@@ -631,22 +631,29 @@ class WazuhEnrichmentConnector:
 
         related_lines: list[str] = []
         if related["ips"]:
-            related_lines.append(f"1. Related IPs: {', '.join(related['ips'])}")
+            related_lines.append(f"- Related IPs: {', '.join(related['ips'])}")
         if related["domains"]:
-            related_lines.append(f"2. Related domains/hosts: {', '.join(related['domains'])}")
+            related_lines.append(f"- Related domains/hosts: {', '.join(related['domains'])}")
         if related["urls"]:
-            related_lines.append(f"3. Related URLs: {', '.join(related['urls'])}")
+            related_lines.append(f"- Related URLs: {', '.join(related['urls'])}")
         if related["hashes"]:
-            related_lines.append(f"4. Related hashes: {', '.join(related['hashes'])}")
+            related_lines.append(f"- Related hashes: {', '.join(related['hashes'])}")
         if related["users"]:
-            related_lines.append(f"5. Related users: {', '.join(related['users'])}")
+            related_lines.append(f"- Related users: {', '.join(related['users'])}")
         if not related_lines:
-            related_lines = ["1. none"]
+            related_lines = ["- none"]
 
         analyst_takeaway = (
             f"This entity matched {total} Wazuh alert(s) across {scoring['unique_agents']} agent(s) "
             f"and {scoring['unique_rules']} rule pattern(s)."
         )
+
+        agents_lines = [f"- {name}: {count}" for name, count in top_agents_list] or ["- none"]
+        rules_lines = [f"- {name}: {count}" for name, count in top_rules_list] or ["- none"]
+        clusters_lines = [
+            f"- Rule {item['rule_id']} on {item['agent']}: {item['count']} hits ({item['rule_desc']})"
+            for item in clusters
+        ] or ["- none"]
 
         lines = [
             header,
@@ -673,18 +680,15 @@ class WazuhEnrichmentConnector:
             "",
             "**Top agents**",
             "",
-            *[f"- {name}: {count}" for name, count in top_agents_list] or ["- none"],
+            *agents_lines,
             "",
             "**Top matching rules**",
             "",
-            *[f"- {name}: {count}" for name, count in top_rules_list] or ["- none"],
+            *rules_lines,
             "",
             "**Top alert clusters**",
             "",
-            *[
-                f"- Rule {item['rule_id']} on {item['agent']}: {item['count']} hits ({item['rule_desc']})"
-                for item in clusters
-            ] or ["- none"],
+            *clusters_lines,
             "",
             "**Related observables for analyst pivoting**",
             "",
