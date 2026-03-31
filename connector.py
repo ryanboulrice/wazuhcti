@@ -648,12 +648,20 @@ class WazuhEnrichmentConnector:
             f"and {scoring['unique_rules']} rule pattern(s)."
         )
 
-        agents_lines = [f"- {name}: {count}" for name, count in top_agents_list] or ["- none"]
-        rules_lines = [f"- {name}: {count}" for name, count in top_rules_list] or ["- none"]
+        agents_lines = [
+            f"{i + 1}. {name}: {count}"
+            for i, (name, count) in enumerate(top_agents_list)
+        ] or ["1. none"]
+
+        rules_lines = [
+            f"{i + 1}. {name}: {count}"
+            for i, (name, count) in enumerate(top_rules_list)
+        ] or ["1. none"]
+
         clusters_lines = [
-            f"- Rule {item['rule_id']} on {item['agent']}: {item['count']} hits ({item['rule_desc']})"
-            for item in clusters
-        ] or ["- none"]
+            f"{i + 1}. Rule {item['rule_id']} on {item['agent']}: {item['count']} hits ({item['rule_desc']})"
+            for i, item in enumerate(clusters)
+        ] or ["1. none"]
 
         lines = [
             header,
@@ -698,7 +706,6 @@ class WazuhEnrichmentConnector:
             "",
             hunt_query,
         ]
-    
 
         if hunt_url:
             lines.extend(["", "**Suggested Wazuh hunt URL**", hunt_url])
