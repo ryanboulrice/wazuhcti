@@ -70,19 +70,13 @@ class WazuhIndexerSearchClient:
 
         # Indicators are inconsistent, adds a broader search against full_log as fallback
         if entity_type == "Indicator":
-            pattern = entity.get("pattern") or ""
-            if isinstance(pattern, str) and "=" in pattern:
-                try:
-                    return pattern.split("=", 1)[1].strip().strip("]").strip().strip("'").strip('"')
-                except Exception:
-                    pass
-        
-            return (
-                entity.get("observable_value")
-                or entity.get("pattern")
-                or entity.get("name")
-                or ""
-            )
+            should_clauses.append(
+                {
+                    "query_string": {
+                        "default_field": "full_log",
+                        "query": escaped_value,
+                    }
+                }
 
         # This is a time-bounded query, keeps results relevant and avoids pulling huge datasets
         body = {
@@ -232,21 +226,22 @@ class WazuhEnrichmentConnector:
             return entity.get("name") or ""
 
         if entity_type == "Indicator":
-            # Indicators can be messy, so this tries multiple fields
+            pattern = entity.get("pattern") or ""
+            if isinstance(pattern, str) and "=" in pattern:
+                try:
+                    right_side = pattern.split("=", 1)[1]
+                    cleaned = right_side.strip().rstrip("]").strip().strip("'").strip('"')
+                    if cleaned:
+                        return cleaned
+                except Exception:
+                    pass
+        
             return (
-                entity.get("name")
-                or entity.get("observable_value")
+                entity.get("observable_value")
                 or entity.get("pattern")
+                or entity.get("name")
                 or ""
             )
-
-        # Generic fallback
-        return (
-            entity.get("observable_value")
-            or entity.get("name")
-            or entity.get("value")
-            or ""
-        )
 
     def _field_map_for_entity_type(self, entity_type: str) -> list[str]:
         # Mapping between OpenCTI types and the various applicable Wazuh fields
