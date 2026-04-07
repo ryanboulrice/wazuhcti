@@ -247,8 +247,12 @@ class WazuhEnrichmentConnector:
         # Mapping between OpenCTI types and the various applicable Wazuh fields
         mapping = {
             "IPv4-Addr": [
+                "data.src_ip",
+                "data.dst_ip",
                 "data.srcip",
                 "data.dstip",
+                "src_ip",
+                "dst_ip",
                 "srcip",
                 "dstip",
                 "data.win.eventdata.sourceIp",
@@ -256,8 +260,12 @@ class WazuhEnrichmentConnector:
                 "full_log",
             ],
             "IPv6-Addr": [
+                "data.src_ip",
+                "data.dst_ip",
                 "data.srcip",
                 "data.dstip",
+                "src_ip",
+                "dst_ip",
                 "srcip",
                 "dstip",
                 "data.win.eventdata.sourceIp",
@@ -265,8 +273,12 @@ class WazuhEnrichmentConnector:
                 "full_log",
             ],
             "Indicator": [
+                "data.src_ip",
+                "data.dst_ip",
                 "data.srcip",
                 "data.dstip",
+                "src_ip",
+                "dst_ip",
                 "srcip",
                 "dstip",
                 "data.domain",
