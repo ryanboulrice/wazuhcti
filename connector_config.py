@@ -74,7 +74,7 @@ class ConnectorConfig:
 
     # Query tuning settings, control how far back and how much data is pulled
     query_lookback_days: int = 30
-    max_results: int = 50
+    max_results: int = 500
 
     # SOC tuning controls, used by enrichment logic to shape output and filtering
     min_rule_level: int = 0
