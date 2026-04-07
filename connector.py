@@ -70,13 +70,18 @@ class WazuhIndexerSearchClient:
 
         # Indicators are inconsistent, adds a broader search against full_log as fallback
         if entity_type == "Indicator":
-            should_clauses.append(
-                {
-                    "query_string": {
-                        "default_field": "full_log",
-                        "query": escaped_value,
-                    }
-                }
+            pattern = entity.get("pattern") or ""
+            if isinstance(pattern, str) and "=" in pattern:
+                try:
+                    return pattern.split("=", 1)[1].strip().strip("]").strip().strip("'").strip('"')
+                except Exception:
+                    pass
+        
+            return (
+                entity.get("observable_value")
+                or entity.get("pattern")
+                or entity.get("name")
+                or ""
             )
 
         # This is a time-bounded query, keeps results relevant and avoids pulling huge datasets
