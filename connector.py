@@ -41,21 +41,18 @@ class WazuhIndexerSearchClient:
         # Basic auth used for indexer access, tied to whatever creds that were configured
         return HTTPBasicAuth(self.username, self.password)
 
-    def search_alerts(
-        self,
+    def search_alerts(self,
         entity_type: str,
         entity_value: str,
         fields: list[str],
         lookback_days: int,
         limit: int,
     ) -> list[dict[str, Any]]:
-        # If we don’t have something meaningful to search, this exits everything early
         if not entity_value or not fields:
             return []
-
-        # Escape characters that break query_string parsing, OpenSearch is picky here
+    
         escaped_value = f"\"{entity_value.replace('\\', '\\\\').replace('\"', '\\\"')}\""
-
+    
         should_clauses: list[dict[str, Any]] = []
         for field in fields:
             # Builds OR logic across multiple fields, the essential core of the search behavior
@@ -63,12 +60,11 @@ class WazuhIndexerSearchClient:
                 {
                     "query_string": {
                         "default_field": field,
-                        "query": f'"{escaped_value}"',
+                        "query": escaped_value,
                     }
                 }
             )
-
-        # Indicators are inconsistent, adds a broader search against full_log as fallback
+    
         if entity_type == "Indicator":
             should_clauses.append(
                 {
@@ -78,7 +74,7 @@ class WazuhIndexerSearchClient:
                     }
                 }
             )
-        # This is a time-bounded query, keeps results relevant and avoids pulling huge datasets
+    
         body = {
             "size": limit,
             "sort": [{"timestamp": {"order": "desc"}}],
@@ -99,9 +95,9 @@ class WazuhIndexerSearchClient:
                 }
             },
         }
-
+    
         url = f"{self.base_url}/{self.index_pattern}/_search"
-
+    
         response = requests.get(
             url,
             headers=self._headers(),
@@ -111,11 +107,10 @@ class WazuhIndexerSearchClient:
             timeout=self.timeout,
         )
         response.raise_for_status()
-
+    
         payload = response.json()
         hits = payload.get("hits", {}).get("hits", [])
-
-        # Return only the actual alert data, strips OpenSearch wrapper
+    
         return [hit.get("_source", {}) for hit in hits if isinstance(hit, dict) and "_source" in hit]
 
 
