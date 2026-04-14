@@ -77,7 +77,7 @@ class WazuhIndexerSearchClient:
                         "query": escaped_value,
                     }
                 }
-
+            )
         # This is a time-bounded query, keeps results relevant and avoids pulling huge datasets
         body = {
             "size": limit,
@@ -242,7 +242,6 @@ class WazuhEnrichmentConnector:
                 or entity.get("name")
                 or ""
             )
-
     def _field_map_for_entity_type(self, entity_type: str) -> list[str]:
         # Mapping between OpenCTI types and the various applicable Wazuh fields
         mapping = {
