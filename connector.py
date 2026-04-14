@@ -41,18 +41,22 @@ class WazuhIndexerSearchClient:
         # Basic auth used for indexer access, tied to whatever creds that were configured
         return HTTPBasicAuth(self.username, self.password)
 
-    def search_alerts(self,
+    def search_alerts(
+        self,
         entity_type: str,
         entity_value: str,
         fields: list[str],
         lookback_days: int,
         limit: int,
     ) -> list[dict[str, Any]]:
+        # If we don’t have something meaningful to search, this exits everything early
         if not entity_value or not fields:
             return []
-    
-        escaped_value = f"\"{entity_value.replace('\\', '\\\\').replace('\"', '\\\"')}\""
-    
+
+        # Escape characters that break query_string parsing, OpenSearch is picky here
+        escaped_value = entity_value.replace("\\", "\\\\").replace('"', '\\"')
+        quoted_value = f"\"{escaped_value}\""
+
         should_clauses: list[dict[str, Any]] = []
         for field in fields:
             # Builds OR logic across multiple fields, the essential core of the search behavior
@@ -60,11 +64,12 @@ class WazuhIndexerSearchClient:
                 {
                     "query_string": {
                         "default_field": field,
-                        "query": escaped_value,
+                        "query": quoted_value,
                     }
                 }
             )
-    
+
+        # Indicators are inconsistent, adds a broader search against full_log as fallback
         if entity_type == "Indicator":
             should_clauses.append(
                 {
@@ -74,7 +79,8 @@ class WazuhIndexerSearchClient:
                     }
                 }
             )
-    
+
+        # This is a time-bounded query, keeps results relevant and avoids pulling huge datasets
         body = {
             "size": limit,
             "sort": [{"timestamp": {"order": "desc"}}],
@@ -95,9 +101,26 @@ class WazuhIndexerSearchClient:
                 }
             },
         }
-    
+
         url = f"{self.base_url}/{self.index_pattern}/_search"
-    
+
+        print(
+            json.dumps(
+                {
+                    "debug_stage": "search_alerts_request",
+                    "entity_type": entity_type,
+                    "entity_value": entity_value,
+                    "fields": fields,
+                    "lookback_days": lookback_days,
+                    "limit": limit,
+                    "url": url,
+                    "body": body,
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+
         response = requests.get(
             url,
             headers=self._headers(),
@@ -107,10 +130,22 @@ class WazuhIndexerSearchClient:
             timeout=self.timeout,
         )
         response.raise_for_status()
-    
+
         payload = response.json()
         hits = payload.get("hits", {}).get("hits", [])
-    
+
+        print(
+            json.dumps(
+                {
+                    "debug_stage": "search_alerts_response",
+                    "hit_count": len(hits),
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+
+        # Return only the actual alert data, strips OpenSearch wrapper
         return [hit.get("_source", {}) for hit in hits if isinstance(hit, dict) and "_source" in hit]
 
 
@@ -230,13 +265,21 @@ class WazuhEnrichmentConnector:
                         return cleaned
                 except Exception:
                     pass
-        
+
             return (
                 entity.get("observable_value")
                 or entity.get("pattern")
                 or entity.get("name")
                 or ""
             )
+
+        return (
+            entity.get("observable_value")
+            or entity.get("name")
+            or entity.get("value")
+            or ""
+        )
+
     def _field_map_for_entity_type(self, entity_type: str) -> list[str]:
         # Mapping between OpenCTI types and the various applicable Wazuh fields
         mapping = {
@@ -529,7 +572,7 @@ class WazuhEnrichmentConnector:
                 if age_seconds <= (self.config.recent_hits_window_hours * 3600):
                     recent_hits += 1
 
-        # Score = number of alerts + severity of alerts + number of affected agents + 
+        # Score = number of alerts + severity of alerts + number of affected agents +
         # how recent the alerts are (each part capped)
         score = 0
         score += min(len(alerts), 25)
@@ -873,6 +916,18 @@ class WazuhEnrichmentConnector:
 
         # Applies SOC-oriented filtering before notes or sightings are generated
         alerts = self._filter_alerts(raw_alerts)
+
+        print(
+            json.dumps(
+                {
+                    "debug_stage": "post_filter",
+                    "raw_alert_count": len(raw_alerts),
+                    "filtered_alert_count": len(alerts),
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
 
         # Builds output
         summary = self._build_summary_note(entity_type, entity_value, alerts)
