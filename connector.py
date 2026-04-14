@@ -54,7 +54,7 @@ class WazuhIndexerSearchClient:
             return []
 
         # Escape characters that break query_string parsing, OpenSearch is picky here
-        escaped_value = entity_value.replace("\\", "\\\\").replace('"', '\\"')
+        escaped_value = f"\"{entity_value.replace('\\', '\\\\').replace('\"', '\\\"')}\""
 
         should_clauses: list[dict[str, Any]] = []
         for field in fields:
