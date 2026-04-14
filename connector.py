@@ -54,35 +54,34 @@ class WazuhIndexerSearchClient:
             return []
 
         should_clauses: list[dict[str, Any]] = []
+
+        # Broad search across all fields
+        should_clauses.append(
+            {
+                "query_string": {
+                    "query": entity_value
+                }
+            }
+        )
+        
+        # Field-level matching for structured fields
         for field in fields:
-            # Builds OR logic across multiple fields, the essential core of the search behavior
-            should_clauses.append(
-                {
-                    "term": {
-                        f"{field}.keyword": entity_value,
-                    }
-                }
-            )
-
-            # Some Wazuh/OpenSearch mappings may not expose a .keyword subfield, so this
-            # adds an exact term attempt against the field itself as a secondary path
-            should_clauses.append(
-                {
-                    "term": {
-                        field: entity_value,
-                    }
-                }
-            )
-
-        # Indicators are inconsistent, adds a broader search against full_log as fallback
-        if entity_type == "Indicator":
             should_clauses.append(
                 {
                     "match": {
-                        "full_log": entity_value,
+                        field: entity_value
                     }
                 }
             )
+        
+        # Fallback against raw logs
+        should_clauses.append(
+            {
+                "match": {
+                    "full_log": entity_value
+                }
+            }
+        )
 
         # This is a time-bounded query, keeps results relevant and avoids pulling huge datasets
         body = {
