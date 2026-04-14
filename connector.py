@@ -112,6 +112,7 @@ class WazuhIndexerSearchClient:
             json.dumps(
                 {
                     "debug_stage": "search_alerts_request",
+                    "http_method": "POST",
                     "entity_type": entity_type,
                     "entity_value": entity_value,
                     "fields": fields,
@@ -125,7 +126,8 @@ class WazuhIndexerSearchClient:
             flush=True,
         )
 
-        response = requests.post(
+        response = requests.request(
+            "POST",
             url,
             headers=self._headers(),
             auth=self._auth(),
