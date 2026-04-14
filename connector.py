@@ -85,7 +85,7 @@ class WazuhIndexerSearchClient:
 
         # This is a time-bounded query, keeps results relevant and avoids pulling huge datasets
         body = {
-            "size": limit,
+            "size": min(limit, 1000),
             "sort": [{"timestamp": {"order": "desc"}}],
             "query": {
                 "bool": {
