@@ -125,7 +125,7 @@ class WazuhIndexerSearchClient:
             flush=True,
         )
 
-        response = requests.get(
+        response = requests.post(
             url,
             headers=self._headers(),
             auth=self._auth(),
