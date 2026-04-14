@@ -53,18 +53,23 @@ class WazuhIndexerSearchClient:
         if not entity_value or not fields:
             return []
 
-        # Escape characters that break query_string parsing, OpenSearch is picky here
-        escaped_value = entity_value.replace("\\", "\\\\").replace('"', '\\"')
-        quoted_value = f"\"{escaped_value}\""
-
         should_clauses: list[dict[str, Any]] = []
         for field in fields:
             # Builds OR logic across multiple fields, the essential core of the search behavior
             should_clauses.append(
                 {
-                    "query_string": {
-                        "default_field": field,
-                        "query": quoted_value,
+                    "term": {
+                        f"{field}.keyword": entity_value,
+                    }
+                }
+            )
+
+            # Some Wazuh/OpenSearch mappings may not expose a .keyword subfield, so this
+            # adds an exact term attempt against the field itself as a secondary path
+            should_clauses.append(
+                {
+                    "term": {
+                        field: entity_value,
                     }
                 }
             )
@@ -73,9 +78,8 @@ class WazuhIndexerSearchClient:
         if entity_type == "Indicator":
             should_clauses.append(
                 {
-                    "query_string": {
-                        "default_field": "full_log",
-                        "query": escaped_value,
+                    "match": {
+                        "full_log": entity_value,
                     }
                 }
             )
