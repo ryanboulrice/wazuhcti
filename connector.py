@@ -13,6 +13,7 @@ import os
 import traceback
 import ipaddress
 import json
+import hashlib
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
@@ -168,6 +169,103 @@ class WazuhEnrichmentConnector:
 
         # In-memory cache for duplicate note suppression during the current connector runtime
         self._note_cache: set[tuple[str, str]] = set()
+
+        # Lightweight persistent state so note and sighting deduplication survives connector restarts
+        self._dedup_window_hours = 24
+        self._state_file = "/var/cache/wazuh/opencti_wazuh_connector_state.json"
+        self._state = self._load_state()
+
+        def _load_state(self) -> dict[str, dict[str, float]]:
+        # Loads a small persistent state file so duplicate notes and sightings can be suppressed across restarts
+        default_state: dict[str, dict[str, float]] = {"notes": {}, "sightings": {}}
+
+        try:
+            os.makedirs(os.path.dirname(self._state_file), exist_ok=True)
+
+            if not os.path.exists(self._state_file):
+                return default_state
+
+            with open(self._state_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            if not isinstance(data, dict):
+                return default_state
+
+            notes = data.get("notes", {})
+            sightings = data.get("sightings", {})
+
+            return {
+                "notes": notes if isinstance(notes, dict) else {},
+                "sightings": sightings if isinstance(sightings, dict) else {},
+            }
+        except Exception:
+            return default_state
+
+    def _save_state(self) -> None:
+        # Writes persistent state safely so the connector can suppress duplicates without corrupting the cache
+        try:
+            os.makedirs(os.path.dirname(self._state_file), exist_ok=True)
+            tmp_file = f"{self._state_file}.tmp"
+
+            with open(tmp_file, "w", encoding="utf-8") as f:
+                json.dump(self._state, f)
+
+            os.replace(tmp_file, self._state_file)
+        except Exception:
+            pass
+
+    def _prune_state(self, window_hours: int | None = None) -> None:
+        # Removes expired cache entries so the state file stays small and deduplication remains time-bounded
+        hours = window_hours or self._dedup_window_hours
+        cutoff = time.time() - (hours * 3600)
+
+        for key in ("notes", "sightings"):
+            bucket = self._state.get(key, {})
+            if not isinstance(bucket, dict):
+                self._state[key] = {}
+                continue
+
+            self._state[key] = {
+                entry_key: ts
+                for entry_key, ts in bucket.items()
+                if isinstance(ts, (int, float)) and ts >= cutoff
+            }
+
+    def _normalize_note_content(self, content: str) -> str:
+        # Normalizes note content so formatting-only differences do not defeat duplicate suppression
+        return " ".join(content.split())
+
+    def _note_fingerprint(self, entity_id: str, content: str) -> str:
+        normalized = self._normalize_note_content(content)
+        raw = f"{entity_id}::{normalized}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _sighting_fingerprint(self, source_id: str, target_id: str) -> str:
+        raw = f"{source_id}::{target_id}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _record_note_creation(self, entity_id: str, content: str) -> None:
+        # Records a note after successful creation so future connector runs can suppress duplicates for 24 hours
+        if not self.config.deduplicate_notes:
+            return
+
+        normalized = self._normalize_note_content(content)
+        self._note_cache.add((entity_id, normalized))
+        self._prune_state()
+        self._state["notes"][self._note_fingerprint(entity_id, content)] = time.time()
+        self._save_state()
+
+    def _should_create_sighting(self, source_id: str, target_id: str) -> bool:
+        # Suppresses duplicate sightings for the same source and target pair inside the configured time window
+        self._prune_state()
+        fingerprint = self._sighting_fingerprint(source_id, target_id)
+        return fingerprint not in self._state.get("sightings", {})
+
+    def _record_sighting_creation(self, source_id: str, target_id: str) -> None:
+        # Records a sighting after successful creation so repeated enrichments do not create duplicate relationships
+        self._prune_state()
+        self._state["sightings"][self._sighting_fingerprint(source_id, target_id)] = time.time()
+        self._save_state()
 
     def _resolve_sighting_source_id(self, entity: dict[str, Any]) -> str | None:
         entity_id = entity.get("id")
@@ -771,12 +869,15 @@ class WazuhEnrichmentConnector:
         if not self.config.deduplicate_notes:
             return True
 
-        cache_key = (entity_id, content)
+        self._prune_state()
+
+        normalized = self._normalize_note_content(content)
+        cache_key = (entity_id, normalized)
         if cache_key in self._note_cache:
             return False
 
-        self._note_cache.add(cache_key)
-        return True
+        fingerprint = self._note_fingerprint(entity_id, content)
+        return fingerprint not in self._state.get("notes", {})
 
     def _create_note(self, entity_id: str, content: str) -> None:
         # Creates and links analyst-facing notes when note output is enabled
@@ -808,6 +909,7 @@ class WazuhEnrichmentConnector:
             id=note_id,
             stixObjectOrStixRelationshipId=entity_id,
         )
+        self._record_note_creation(entity_id, content)
 
         self.helper.log_info(
             "Created and linked Wazuh note",
@@ -846,6 +948,16 @@ class WazuhEnrichmentConnector:
         if not source_id or not target_id or not alerts:
             return
 
+        if not self._should_create_sighting(source_id, target_id):
+            self.helper.log_info(
+                "Skipping duplicate Wazuh sighting",
+                {
+                    "source_id": source_id,
+                    "target_id": target_id,
+                },
+            )
+            return
+
         first_seen = self._normalize_opencti_datetime(
             self._safe_get(alerts[-1], "timestamp")
         )
@@ -863,9 +975,11 @@ class WazuhEnrichmentConnector:
                 count=count,
                 description=f"Wazuh enrichment found {count} matches",
             )
+
+            self._record_sighting_creation(source_id, target_id)
         except Exception as exc:
             self.helper.log_warning(f"Failed to create sighting: {exc}")
-
+            
     def _process_entity(self, data: dict[str, Any]) -> str:
         # Main enrichment pipeline, everything flows through here
         entity = self._extract_entity(data)
