@@ -175,7 +175,7 @@ class WazuhEnrichmentConnector:
         self._state_file = "/var/cache/wazuh/opencti_wazuh_connector_state.json"
         self._state = self._load_state()
 
-        def _load_state(self) -> dict[str, dict[str, float]]:
+    def _load_state(self) -> dict[str, dict[str, float]]:
         # Loads a small persistent state file so duplicate notes and sightings can be suppressed across restarts
         default_state: dict[str, dict[str, float]] = {"notes": {}, "sightings": {}}
 
